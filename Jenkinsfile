@@ -7,9 +7,9 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = "YOUR_DOCKERHUB_USERNAME/owasp-jenkins"
+        IMAGE_NAME = "vinothkumaraws/owasp-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        APP_SERVER = "YOUR_EC2_PUBLIC_IP"
+        APP_SERVER = "16.170.133.87"
     }
 
     stages {
