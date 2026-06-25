@@ -6,6 +6,12 @@ pipeline {
         maven 'Maven'
     }
 
+    environment {
+        IMAGE_NAME = "YOUR_DOCKERHUB_USERNAME/owasp-jenkins"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        APP_SERVER = "YOUR_EC2_PUBLIC_IP"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -34,15 +40,94 @@ pipeline {
             }
         }
 
+        stage('OWASP Dependency Check') {
+            steps {
+                dependencyCheck(
+                    odcInstallation: 'DependencyCheck',
+                    additionalArguments: '--scan .'
+                )
+            }
+        }
+
+        stage('Publish OWASP Report') {
+            steps {
+                dependencyCheckPublisher(
+                    pattern: '**/dependency-check-report.xml'
+                )
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh '''
+                docker build -t $IMAGE_NAME:$IMAGE_TAG .
+                docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+                '''
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                sh '''
+                docker push $IMAGE_NAME:$IMAGE_TAG
+                docker push $IMAGE_NAME:latest
+                '''
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(['ec2-key']) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ubuntu@$APP_SERVER "
+
+                    docker pull $IMAGE_NAME:latest
+
+                    docker stop java-app || true
+
+                    docker rm java-app || true
+
+                    docker run -d \
+                    --name java-app \
+                    -p 8080:8080 \
+                    $IMAGE_NAME:latest
+
+                    "
+                    '''
+                }
+            }
+        }
+
     }
 
     post {
+
         success {
             echo 'Pipeline completed successfully!'
         }
 
         failure {
             echo 'Pipeline failed!'
+        }
+
+        always {
+            cleanWs()
         }
     }
 }
