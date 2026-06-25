@@ -42,10 +42,21 @@ pipeline {
 
         stage('OWASP Dependency Check') {
             steps {
-                dependencyCheck(
-                    odcInstallation: 'DependencyCheck',
-                    additionalArguments: '--scan .'
-                )
+
+                withCredentials([
+                    string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')
+                ]) {
+
+                    sh '''
+                    ${DEPENDENCY_CHECK} \
+                    --project "OWASP-Jenkins" \
+                    --scan . \
+                    --out dependency-check-report \
+                    --format XML \
+                    --format HTML \
+                    --nvdApiKey $NVD_API_KEY
+                    '''
+                }
             }
         }
 
