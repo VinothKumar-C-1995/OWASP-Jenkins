@@ -1,10 +1,17 @@
-<dependencies>
+<build>
 
-    <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter</artifactId>
-        <version>5.10.2</version>
-        <scope>test</scope>
-    </dependency>
+    <plugins>
 
-</dependencies>
+        <plugin>
+
+            <groupId>org.sonarsource.scanner.maven</groupId>
+
+            <artifactId>sonar-maven-plugin</artifactId>
+
+            <version>3.11.0.3922</version>
+
+        </plugin>
+
+    </plugins>
+
+</build>
