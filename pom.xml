@@ -1,17 +1,48 @@
-<build>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-    <plugins>
+    <modelVersion>4.0.0</modelVersion>
 
-        <plugin>
+    <groupId>com.example</groupId>
 
-            <groupId>org.sonarsource.scanner.maven</groupId>
+    <artifactId>OWASP-Jenkins</artifactId>
 
-            <artifactId>sonar-maven-plugin</artifactId>
+    <version>1.0.0</version>
 
-            <version>3.11.0.3922</version>
+    <packaging>jar</packaging>
 
-        </plugin>
+    <build>
 
-    </plugins>
+        <plugins>
 
-</build>
+            <!-- Maven Compiler -->
+
+            <plugin>
+
+                <groupId>org.apache.maven.plugins</groupId>
+
+                <artifactId>maven-compiler-plugin</artifactId>
+
+                <version>3.13.0</version>
+
+            </plugin>
+
+            <!-- Sonar -->
+
+            <plugin>
+
+                <groupId>org.sonarsource.scanner.maven</groupId>
+
+                <artifactId>sonar-maven-plugin</artifactId>
+
+                <version>3.11.0.3922</version>
+
+            </plugin>
+
+        </plugins>
+
+    </build>
+
+</project>
