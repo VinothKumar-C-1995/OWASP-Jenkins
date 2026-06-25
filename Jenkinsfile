@@ -9,7 +9,8 @@ pipeline {
     environment {
         IMAGE_NAME = "vinothkumaraws/owasp-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        APP_SERVER = "16.170.133.87"
+        APP_SERVER = 16.170.133.87
+        DEPENDENCY_CHECK = "/opt/dependency-check/bin/dependency-check.sh"
     }
 
     stages {
@@ -35,7 +36,9 @@ pipeline {
         stage('SonarQube Scan') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh 'mvn sonar:sonar'
+                    sh '''
+                    mvn sonar:sonar
+                    '''
                 }
             }
         }
@@ -63,7 +66,7 @@ pipeline {
         stage('Publish OWASP Report') {
             steps {
                 dependencyCheckPublisher(
-                    pattern: '**/dependency-check-report.xml'
+                    pattern: '**/dependency-check-report/dependency-check-report.xml'
                 )
             }
         }
@@ -71,8 +74,8 @@ pipeline {
         stage('Docker Build') {
             steps {
                 sh '''
-                docker build -t $IMAGE_NAME:$IMAGE_TAG .
-                docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
                 '''
             }
         }
@@ -86,6 +89,7 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
+
                     sh '''
                     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
                     '''
@@ -96,19 +100,22 @@ pipeline {
         stage('Docker Push') {
             steps {
                 sh '''
-                docker push $IMAGE_NAME:$IMAGE_TAG
-                docker push $IMAGE_NAME:latest
+                docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                docker push ${IMAGE_NAME}:latest
                 '''
             }
         }
 
         stage('Deploy to EC2') {
-            steps {
-                sshagent(['ec2-key']) {
-                    sh '''
-                    ssh -o StrictHostKeyChecking=no ubuntu@$APP_SERVER "
 
-                    docker pull $IMAGE_NAME:latest
+            steps {
+
+                sshagent(['ec2-key']) {
+
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} "
+
+                    docker pull ${IMAGE_NAME}:latest
 
                     docker stop java-app || true
 
@@ -117,12 +124,14 @@ pipeline {
                     docker run -d \
                     --name java-app \
                     -p 8080:8080 \
-                    $IMAGE_NAME:latest
+                    ${IMAGE_NAME}:latest
 
                     "
                     '''
                 }
+
             }
+
         }
 
     }
@@ -130,15 +139,29 @@ pipeline {
     post {
 
         success {
+
+            echo '================================='
             echo 'Pipeline completed successfully!'
+            echo '================================='
+
         }
 
         failure {
+
+            echo '================================='
             echo 'Pipeline failed!'
+            echo '================================='
+
         }
 
         always {
+
+            archiveArtifacts artifacts: 'dependency-check-report/**/*', fingerprint: true
+
             cleanWs()
+
         }
+
     }
+
 }
