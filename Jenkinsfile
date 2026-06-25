@@ -9,7 +9,7 @@ pipeline {
     environment {
         IMAGE_NAME = "vinothkumaraws/owasp-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        APP_SERVER = 16.170.133.87
+        APP_SERVER = "16.16.216.176"
         DEPENDENCY_CHECK = "/opt/dependency-check/bin/dependency-check.sh"
     }
 
