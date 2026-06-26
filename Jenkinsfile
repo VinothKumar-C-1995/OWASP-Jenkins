@@ -1,3 +1,4 @@
+```groovy
 pipeline {
 
     agent any
@@ -7,9 +8,9 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = 'vinothkumaraws/owasp-app'
-        IMAGE_TAG  = "${BUILD_NUMBER}"
-        APP_SERVER = '13.50.236.28'
+        IMAGE_NAME = "YOUR_DOCKERHUB_USERNAME/owasp-jenkins"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        APP_SERVER = "YOUR_EC2_PUBLIC_IP"
     }
 
     stages {
@@ -50,14 +51,18 @@ pipeline {
                         string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')
                     ]) {
 
+                        sh '''
+                            mkdir -p dependency-check-report
+                        '''
+
                         sh """
-                        ${dcHome}/bin/dependency-check.sh \
-                        --project "OWASP-Jenkins" \
-                        --scan . \
-                        --format XML \
-                        --format HTML \
-                        --out dependency-check-report \
-                        --nvdApiKey \$NVD_API_KEY
+                            ${dcHome}/bin/dependency-check.sh \
+                            --project "OWASP-Jenkins" \
+                            --scan . \
+                            --format HTML \
+                            --format XML \
+                            --out dependency-check-report \
+                            --nvdApiKey \$NVD_API_KEY
                         """
                     }
                 }
@@ -74,10 +79,10 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh """
-                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-                """
+                sh '''
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+                '''
             }
         }
 
@@ -90,9 +95,8 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-
                     sh '''
-                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
                     '''
                 }
             }
@@ -100,22 +104,21 @@ pipeline {
 
         stage('Docker Push') {
             steps {
-                sh """
-                docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                docker push ${IMAGE_NAME}:latest
-                """
+                sh '''
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${IMAGE_NAME}:latest
+                '''
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-
                 sshagent(['ec2-key']) {
 
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} '
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no ubuntu@'"${APP_SERVER}"' << EOF
 
-                    docker pull ${IMAGE_NAME}:latest
+                    docker pull '"${IMAGE_NAME}"':latest
 
                     docker stop java-app || true
 
@@ -124,10 +127,10 @@ pipeline {
                     docker run -d \
                         --name java-app \
                         -p 8080:8080 \
-                        ${IMAGE_NAME}:latest
-                    '
-                    """
+                        '"${IMAGE_NAME}"':latest
 
+                    EOF
+                    '''
                 }
             }
         }
@@ -136,20 +139,24 @@ pipeline {
     post {
 
         success {
-            echo '===================================='
-            echo 'PIPELINE COMPLETED SUCCESSFULLY'
-            echo '===================================='
+            echo "=================================="
+            echo "PIPELINE COMPLETED SUCCESSFULLY"
+            echo "=================================="
         }
 
         failure {
-            echo '===================================='
-            echo 'PIPELINE FAILED'
-            echo '===================================='
+            echo "=================================="
+            echo "PIPELINE FAILED"
+            echo "=================================="
         }
 
         always {
+
             archiveArtifacts artifacts: 'dependency-check-report/**/*', fingerprint: true
+
             cleanWs()
+
         }
     }
 }
+```
