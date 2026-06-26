@@ -1,4 +1,3 @@
-```groovy
 pipeline {
 
     agent any
@@ -8,9 +7,9 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = "YOUR_DOCKERHUB_USERNAME/owasp-jenkins"
+        IMAGE_NAME = "vinothkumaraws/owasp-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        APP_SERVER = "YOUR_EC2_PUBLIC_IP"
+        APP_SERVER = "13.50.236.28"
     }
 
     stages {
@@ -59,9 +58,9 @@ pipeline {
                             ${dcHome}/bin/dependency-check.sh \
                             --project "OWASP-Jenkins" \
                             --scan . \
+                            --out dependency-check-report \
                             --format HTML \
                             --format XML \
-                            --out dependency-check-report \
                             --nvdApiKey \$NVD_API_KEY
                         """
                     }
@@ -79,10 +78,10 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh '''
+                sh """
                     docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                     docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-                '''
+                """
             }
         }
 
@@ -104,33 +103,32 @@ pipeline {
 
         stage('Docker Push') {
             steps {
-                sh '''
+                sh """
                     docker push ${IMAGE_NAME}:${IMAGE_TAG}
                     docker push ${IMAGE_NAME}:latest
-                '''
+                """
             }
         }
 
         stage('Deploy to EC2') {
             steps {
                 sshagent(['ec2-key']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} << EOF
 
-                    sh '''
-                    ssh -o StrictHostKeyChecking=no ubuntu@'"${APP_SERVER}"' << EOF
+                        docker pull ${IMAGE_NAME}:latest
 
-                    docker pull '"${IMAGE_NAME}"':latest
+                        docker stop java-app || true
 
-                    docker stop java-app || true
+                        docker rm java-app || true
 
-                    docker rm java-app || true
+                        docker run -d \
+                          --name java-app \
+                          -p 8080:8080 \
+                          ${IMAGE_NAME}:latest
 
-                    docker run -d \
-                        --name java-app \
-                        -p 8080:8080 \
-                        '"${IMAGE_NAME}"':latest
-
-                    EOF
-                    '''
+                        EOF
+                    """
                 }
             }
         }
@@ -139,24 +137,20 @@ pipeline {
     post {
 
         success {
-            echo "=================================="
+            echo "===================================="
             echo "PIPELINE COMPLETED SUCCESSFULLY"
-            echo "=================================="
+            echo "===================================="
         }
 
         failure {
-            echo "=================================="
+            echo "===================================="
             echo "PIPELINE FAILED"
-            echo "=================================="
+            echo "===================================="
         }
 
         always {
-
             archiveArtifacts artifacts: 'dependency-check-report/**/*', fingerprint: true
-
             cleanWs()
-
         }
     }
 }
-```
