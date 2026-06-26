@@ -7,10 +7,9 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = "vinothkumaraws/owasp-app"
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        APP_SERVER = "16.170.133.87"
-        DEPENDENCY_CHECK = "/opt/dependency-check-tool/bin/dependency-check.sh"
+        IMAGE_NAME = 'vinothkumaraws/owasp-app'
+        IMAGE_TAG  = "${BUILD_NUMBER}"
+        APP_SERVER = '13.50.236.28'
     }
 
     stages {
@@ -36,29 +35,31 @@ pipeline {
         stage('SonarQube Scan') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
-                    mvn sonar:sonar
-                    '''
+                    sh 'mvn sonar:sonar'
                 }
             }
         }
 
         stage('OWASP Dependency Check') {
             steps {
+                script {
 
-                withCredentials([
-                    string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')
-                ]) {
+                    def dcHome = tool 'DependencyCheck'
 
-                    sh '''
-                    ${DEPENDENCY_CHECK} \
-                    --project "OWASP-Jenkins" \
-                    --scan . \
-                    --out dependency-check-report \
-                    --format XML \
-                    --format HTML \
-                    --nvdApiKey $NVD_API_KEY
-                    '''
+                    withCredentials([
+                        string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')
+                    ]) {
+
+                        sh """
+                        ${dcHome}/bin/dependency-check.sh \
+                        --project "OWASP-Jenkins" \
+                        --scan . \
+                        --format XML \
+                        --format HTML \
+                        --out dependency-check-report \
+                        --nvdApiKey \$NVD_API_KEY
+                        """
+                    }
                 }
             }
         }
@@ -66,17 +67,17 @@ pipeline {
         stage('Publish OWASP Report') {
             steps {
                 dependencyCheckPublisher(
-                    pattern: '**/dependency-check-report/dependency-check-report.xml'
+                    pattern: 'dependency-check-report/dependency-check-report.xml'
                 )
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh '''
+                sh """
                 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-                '''
+                """
             }
         }
 
@@ -99,21 +100,20 @@ pipeline {
 
         stage('Docker Push') {
             steps {
-                sh '''
+                sh """
                 docker push ${IMAGE_NAME}:${IMAGE_TAG}
                 docker push ${IMAGE_NAME}:latest
-                '''
+                """
             }
         }
 
         stage('Deploy to EC2') {
-
             steps {
 
                 sshagent(['ec2-key']) {
 
-                    sh '''
-                    ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} "
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} '
 
                     docker pull ${IMAGE_NAME}:latest
 
@@ -122,46 +122,34 @@ pipeline {
                     docker rm java-app || true
 
                     docker run -d \
-                    --name java-app \
-                    -p 8080:8080 \
-                    ${IMAGE_NAME}:latest
+                        --name java-app \
+                        -p 8080:8080 \
+                        ${IMAGE_NAME}:latest
+                    '
+                    """
 
-                    "
-                    '''
                 }
-
             }
-
         }
-
     }
 
     post {
 
         success {
-
-            echo '================================='
-            echo 'Pipeline completed successfully!'
-            echo '================================='
-
+            echo '===================================='
+            echo 'PIPELINE COMPLETED SUCCESSFULLY'
+            echo '===================================='
         }
 
         failure {
-
-            echo '================================='
-            echo 'Pipeline failed!'
-            echo '================================='
-
+            echo '===================================='
+            echo 'PIPELINE FAILED'
+            echo '===================================='
         }
 
         always {
-
             archiveArtifacts artifacts: 'dependency-check-report/**/*', fingerprint: true
-
             cleanWs()
-
         }
-
     }
-
 }
